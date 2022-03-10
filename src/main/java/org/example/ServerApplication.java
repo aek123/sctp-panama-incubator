@@ -11,7 +11,6 @@ import netinet.sctp.sctp_sndrcvinfo;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -27,9 +26,6 @@ public class ServerApplication {
                 InetAddress.getByName("127.0.0.2"),
                 InetAddress.getByName("127.0.0.3")
         );
-        if (addresses.isEmpty()) {
-            throw new IllegalStateException("Need an address to bind");
-        }
         try (ResourceScope scope = ResourceScope.newSharedScope()) {
             int socket = socket(AF_INET(), SOCK_STREAM(), IPPROTO_SCTP());
             System.out.println("Socket: " + socket);
@@ -82,12 +78,10 @@ public class ServerApplication {
                     int address = Integer.reverseBytes(in_addr.s_addr$get(sockaddr_in.sin_addr$slice(fromAddress)));
                     InetAddress inetAddress = InetAddress.getByAddress(BigInteger.valueOf(address).toByteArray());
                     String fromAddressString = inetAddress.getHostAddress();
-                    byte[] messageBytes = new byte[receivedBytes];
-                    buffer.asByteBuffer().get(messageBytes, 0, receivedBytes);
-                    String receivedMessageString = new String(Arrays.copyOfRange(messageBytes, 0, receivedBytes - 1));
-                    System.out.printf("From %s message is '%s'%n", fromAddressString, receivedMessageString);
+                    String receivedMessage = buffer.getUtf8String(0).substring(0, receivedBytes - 1).replace("\n", "");
+                    System.out.printf("From %s message is '%s'%n", fromAddressString, receivedMessage);
                     TimeUnit.SECONDS.sleep(1);
-                    sendMessage(clientSocket, scope, receivedMessageString);
+                    sendMessage(clientSocket, scope, receivedMessage);
                 } while (true);
             } catch (Exception e) {
                 e.printStackTrace();
