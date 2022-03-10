@@ -10,7 +10,6 @@ import netinet.sctp.sctp_sndrcvinfo;
 
 import java.math.BigInteger;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
@@ -37,14 +36,14 @@ public class ServerApplication {
             for (int i = 0; i < addresses.size(); i++) {
                 InetAddress inetAddress = addresses.get(i);
                 var address = createAddressSegment(inetAddress.getAddress(), localPort);
-                int result = Integer.MIN_VALUE;
+                int bindResult;
                 if (i == 0) {
-                    result = bind(socket, address, (int) sockaddr_in.sizeof());
+                    bindResult = bind(socket, address, (int) sockaddr_in.sizeof());
                 } else {
-                    result = sctp_bindx(socket, address, 1, SCTP_BINDX_ADD_ADDR());
+                    bindResult = sctp_bindx(socket, address, 1, SCTP_BINDX_ADD_ADDR());
                 }
                 System.out.printf("Bind result for %s: %s%n", inetAddress.getHostAddress(),
-                                  result < 0 ? "FAILED!" : "OK!");
+                                  bindResult < 0 ? "FAILED!" : "OK!");
             }
             System.out.println("Listen result: " + listen(socket, 1));
             MemorySegment clientAddress = sockaddr_in.allocate(SegmentAllocator.implicitAllocator());
@@ -58,17 +57,6 @@ public class ServerApplication {
             CompletableFuture<Void> future = listenSocket(accept, scope);
             System.out.println("Connected port: " + Short.reverseBytes(sockaddr_in.sin_port$get(clientAddress)));
             TimeUnit.SECONDS.sleep(5);
-            var messageString = "hello";
-            MemorySegment message = MemorySegment.allocateNative(messageString.length() + 1, scope);
-            message.setUtf8String(0, messageString);
-            for (int i = 0; i < 5; i++) {
-                MemorySegment sendInfo = sctp_sndrcvinfo.allocate(scope);
-                sctp_sndrcvinfo.sinfo_stream$set(sendInfo, (short) 8);
-                sctp_sndrcvinfo.sinfo_ppid$set(sendInfo, Integer.reverseBytes(100));
-                int writtenBytes = sctp_send(accept, message, message.byteSize(), sendInfo, 0);
-                System.out.printf("Written bytes in %d repeat: %d%n", i + 1, writtenBytes);
-                TimeUnit.SECONDS.sleep(2);
-            }
             future.get();
             System.err.println("System closed!");
         }
@@ -96,10 +84,12 @@ public class ServerApplication {
                     String fromAddressString = inetAddress.getHostAddress();
                     byte[] messageBytes = new byte[receivedBytes];
                     buffer.asByteBuffer().get(messageBytes, 0, receivedBytes);
-                    String receivedMessageString = new String(Arrays.copyOfRange(messageBytes, 0, receivedBytes - 2));
+                    String receivedMessageString = new String(Arrays.copyOfRange(messageBytes, 0, receivedBytes - 1));
                     System.out.printf("From %s message is '%s'%n", fromAddressString, receivedMessageString);
+                    TimeUnit.SECONDS.sleep(1);
+                    sendMessage(clientSocket, scope, receivedMessageString);
                 } while (true);
-            } catch (UnknownHostException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         });
@@ -112,5 +102,17 @@ public class ServerApplication {
         int reversed = Integer.reverseBytes(ByteBuffer.wrap(host).getInt());
         in_addr.s_addr$set(sockaddr_in.sin_addr$slice(address), reversed);
         return address;
+    }
+
+    private static void sendMessage(int clientSocket, ResourceScope scope, String messageString) {
+        MemorySegment message = MemorySegment.allocateNative(messageString.length() + 1, scope);
+        message.setUtf8String(0, messageString);
+        MemorySegment sendInfo = sctp_sndrcvinfo.allocate(scope);
+        sctp_sndrcvinfo.sinfo_stream$set(sendInfo, (short) 8);
+        sctp_sndrcvinfo.sinfo_ppid$set(sendInfo, Integer.reverseBytes(100));
+        int writtenBytes = sctp_send(clientSocket, message, message.byteSize(), sendInfo, 0);
+        if (writtenBytes < 0) {
+            throw new IllegalStateException("Send failed!!!");
+        }
     }
 }
