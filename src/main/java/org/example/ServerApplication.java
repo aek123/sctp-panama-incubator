@@ -78,7 +78,7 @@ public class ServerApplication {
                     int address = Integer.reverseBytes(in_addr.s_addr$get(sockaddr_in.sin_addr$slice(fromAddress)));
                     InetAddress inetAddress = InetAddress.getByAddress(BigInteger.valueOf(address).toByteArray());
                     String fromAddressString = inetAddress.getHostAddress();
-                    String receivedMessage = buffer.getUtf8String(0).substring(0, receivedBytes - 1).replace("\n", "");
+                    String receivedMessage = buffer.getUtf8String(0).replace("\n", "");
                     System.out.printf("From %s message is '%s'%n", fromAddressString, receivedMessage);
                     TimeUnit.SECONDS.sleep(1);
                     sendMessage(clientSocket, scope, receivedMessage);
