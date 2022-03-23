@@ -31,7 +31,7 @@ public class ServerApplication {
             System.out.println("Socket: " + socket);
             for (int i = 0; i < addresses.size(); i++) {
                 InetAddress inetAddress = addresses.get(i);
-                var address = createAddressSegment(inetAddress.getAddress(), localPort);
+                var address = createAddressSegment(scope, inetAddress.getAddress(), localPort);
                 int bindResult;
                 if (i == 0) {
                     bindResult = bind(socket, address, (int) sockaddr_in.sizeof());
@@ -81,7 +81,7 @@ public class ServerApplication {
                     String receivedMessage = buffer.getUtf8String(0).replace("\n", "");
                     System.out.printf("From %s message is '%s'%n", fromAddressString, receivedMessage);
                     TimeUnit.SECONDS.sleep(1);
-                    sendMessage(clientSocket, scope, receivedMessage);
+                    sendMessage(scope, clientSocket, receivedMessage);
                 } while (true);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -89,8 +89,8 @@ public class ServerApplication {
         });
     }
 
-    private static MemorySegment createAddressSegment(byte[] host, short port) {
-        MemorySegment address = sockaddr_in.allocate(SegmentAllocator.implicitAllocator());
+    private static MemorySegment createAddressSegment(ResourceScope scope, byte[] host, short port) {
+        MemorySegment address = sockaddr_in.allocate(scope);
         sockaddr_in.sin_family$set(address, (short) AF_INET());
         sockaddr_in.sin_port$set(address, Short.reverseBytes(port));
         int reversed = Integer.reverseBytes(ByteBuffer.wrap(host).getInt());
@@ -98,7 +98,7 @@ public class ServerApplication {
         return address;
     }
 
-    private static void sendMessage(int clientSocket, ResourceScope scope, String messageString) {
+    private static void sendMessage(ResourceScope scope, int clientSocket, String messageString) {
         MemorySegment message = MemorySegment.allocateNative(messageString.length() + 1, scope);
         message.setUtf8String(0, messageString);
         MemorySegment sendInfo = sctp_sndrcvinfo.allocate(scope);
