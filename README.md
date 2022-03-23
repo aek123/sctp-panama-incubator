@@ -5,7 +5,7 @@ Eiter java 19-panama+1-13 or java 18(ea-35 or later) required.
 In order to run following VM options required: 
 
     --add-modules jdk.incubator.foreign
-    --enable-native-access sctp.panama.incubator
+    --enable-native-access ALL-UNNAMED
 
 java 19-panama+1-13 jextract used for generated files from header files.
 
