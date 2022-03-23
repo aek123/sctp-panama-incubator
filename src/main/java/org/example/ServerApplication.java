@@ -11,6 +11,7 @@ import netinet.sctp.sctp_sndrcvinfo;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -99,7 +100,8 @@ public class ServerApplication {
     }
 
     private static void sendMessage(ResourceScope scope, int clientSocket, String messageString) {
-        MemorySegment message = MemorySegment.allocateNative(messageString.length() + 1, scope);
+        int bytesSize = messageString.getBytes(StandardCharsets.UTF_8).length + 1;
+        MemorySegment message = MemorySegment.allocateNative(bytesSize, scope);
         message.setUtf8String(0, messageString);
         MemorySegment sendInfo = sctp_sndrcvinfo.allocate(scope);
         sctp_sndrcvinfo.sinfo_stream$set(sendInfo, (short) 8);
