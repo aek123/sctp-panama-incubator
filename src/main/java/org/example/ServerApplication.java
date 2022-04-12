@@ -2,10 +2,7 @@ package org.example;
 
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
-import netinet.in.in_addr;
-import netinet.in.sockaddr_in;
 
-import java.math.BigInteger;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -51,14 +48,12 @@ public class ServerApplication {
             try {
                 MemorySegment buffer = MemorySegment.allocateNative(1024, scope);
                 do {
-                    ReceiveInfo receive = receiveMessage(scope, buffer, clientSocket);
-                    if (receive.receivedBytes() < 0) {
+                    ReceiveInfo receiveInfo = receiveMessage(scope, buffer, clientSocket);
+                    if (receiveInfo.receivedBytes() < 0) {
                         LOGGER.info("Client disconnected!");
                         break;
                     }
-                    int address = Integer.reverseBytes(in_addr.s_addr$get(sockaddr_in.sin_addr$slice(receive.fromAddress())));
-                    InetAddress inetAddress = InetAddress.getByAddress(BigInteger.valueOf(address).toByteArray());
-                    String fromAddressString = inetAddress.getHostAddress();
+                    String fromAddressString = receiveInfo.getAddress().getHostAddress();
                     String receivedMessage = buffer.getUtf8String(0).replace("\n", "");
                     LOGGER.info(() -> "From %s message is '%s'".formatted(fromAddressString, receivedMessage));
                     TimeUnit.SECONDS.sleep(1);
