@@ -33,7 +33,7 @@ public record AcceptInfo(MemorySegment socketAddress, int clientSocket) {
         }
     }
 
-    public List<InetAddress> clients() throws UnknownHostException {
+    public List<InetAddress> clientAddresses() throws UnknownHostException {
         ByteBuffer buffer = sockaddr_in.sin_addr$slice(socketAddress).asByteBuffer();
         return switch (getFamily()) {
             case INET -> getInetAddresses(buffer, 4);

@@ -38,7 +38,7 @@ public class ServerApplication {
             if (acceptInfo.clientSocket() == -1) {
                 throw new IllegalStateException("Client could not connect");
             }
-            List<InetAddress> clients = acceptInfo.clients();
+            List<InetAddress> clients = acceptInfo.clientAddresses();
             LOGGER.info(() -> "Connected %s client(s) in port: %d".formatted(clients, acceptInfo.getPort()));
             CompletableFuture<Void> future = listenSocket(acceptInfo.clientSocket(), scope);
             future.get();
