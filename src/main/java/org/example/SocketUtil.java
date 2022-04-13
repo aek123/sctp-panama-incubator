@@ -19,7 +19,21 @@ public class SocketUtil {
     private SocketUtil() {
     }
 
-    public static int createSocket(List<InetAddress> addresses, short localPort, ResourceScope scope) {
+    public static void connectClient(ResourceScope scope, int socket, List<InetAddress> addresses, short remotePort) {
+        if (addresses.size() < 1) {
+            throw new IllegalArgumentException("There is no address to connect.");
+        } else if (addresses.size() == 1) {
+            MemorySegment addressSegment = createAddressSegment(scope, addresses.get(0).getAddress(), remotePort);
+            int connect = connect(socket, addressSegment, ((int) sockaddr_in.sizeof()));
+            if (connect < 0) {
+                throw new IllegalStateException("Could not connect to server.");
+            }
+        } else {
+            // TODO: implement
+        }
+    }
+
+    public static int createSocket(ResourceScope scope, List<InetAddress> addresses, short localPort) {
         int socket = socket(AF_INET(), SOCK_STREAM(), IPPROTO_SCTP());
         if (socket < 0) {
             throw new IllegalStateException("Socket creation failure");

@@ -26,7 +26,7 @@ public class ServerApplication {
                 InetAddress.getByName("127.0.0.3")
         );
         try (ResourceScope scope = ResourceScope.newSharedScope()) {
-            int socket = createSocket(addresses, localPort, scope);
+            int socket = createSocket(scope, addresses, localPort);
             int listenResult = listen(socket, 1);
             if (listenResult < 0) {
                 throw new IllegalStateException("Listening given socket failed.");
@@ -37,13 +37,13 @@ public class ServerApplication {
             }
             List<InetAddress> clients = acceptInfo.clientAddresses();
             LOGGER.info(() -> "Connected %s client(s) in port: %d".formatted(clients, acceptInfo.getPort()));
-            CompletableFuture<Void> future = listenSocket(acceptInfo.clientSocket(), scope);
+            CompletableFuture<Void> future = listenClientSocket(scope, acceptInfo.clientSocket());
             future.get();
             LOGGER.info("System closed!");
         }
     }
 
-    private static CompletableFuture<Void> listenSocket(int clientSocket, ResourceScope scope) {
+    private static CompletableFuture<Void> listenClientSocket(ResourceScope scope, int clientSocket) {
         return CompletableFuture.runAsync(() -> {
             try {
                 MemorySegment buffer = MemorySegment.allocateNative(1024, scope);
