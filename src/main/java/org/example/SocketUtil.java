@@ -5,6 +5,8 @@ import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.ValueLayout;
 import netinet.in.in_addr;
 import netinet.in.sockaddr_in;
+import netinet.sctp.sctp_event_subscribe;
+import netinet.sctp.sctp_initmsg;
 import netinet.sctp.sctp_sndrcvinfo;
 
 import java.net.InetAddress;
@@ -19,17 +21,19 @@ public class SocketUtil {
     private SocketUtil() {
     }
 
-    public static void connectClient(ResourceScope scope, int socket, List<InetAddress> addresses, short remotePort) {
-        if (addresses.size() < 1) {
+    public static void connectClient(ResourceScope scope, int socket, List<InetAddress> addressList, short remotePort) {
+        if (addressList.size() < 1) {
             throw new IllegalArgumentException("There is no address to connect.");
-        } else if (addresses.size() == 1) {
-            MemorySegment addressSegment = createAddressSegment(scope, addresses.get(0).getAddress(), remotePort);
-            int connect = connect(socket, addressSegment, ((int) sockaddr_in.sizeof()));
-            if (connect < 0) {
-                throw new IllegalStateException("Could not connect to server.");
-            }
         } else {
-            // TODO: implement
+            MemorySegment addresses = sockaddr_in.allocateArray(addressList.size(), scope);
+
+            addresses.spliterator(sockaddr_in.$LAYOUT());
+            MemorySegment nill = MemorySegment.allocateNative(Integer.BYTES, scope);
+            nill.set(ValueLayout.JAVA_INT, 0, 0);
+            int connectx = sctp_connectx(socket, addresses, addressList.size(), nill);
+            if (connectx < 0) {
+                throw new IllegalStateException("Connectx failure");
+            }
         }
     }
 
@@ -37,6 +41,12 @@ public class SocketUtil {
         int socket = socket(AF_INET(), SOCK_STREAM(), IPPROTO_SCTP());
         if (socket < 0) {
             throw new IllegalStateException("Socket creation failure");
+        }
+        if (setEventSubscriptions(scope, socket) < 0) {
+            throw new IllegalStateException("SCTP_EVENT_SUBSCRIBE event set failure");
+        }
+        if (setInitMessage(scope, socket) < 0) {
+            throw new IllegalStateException("SCTP_INITMSG event set failure");
         }
         for (int i = 0; i < addresses.size(); i++) {
             InetAddress inetAddress = addresses.get(i);
@@ -52,6 +62,23 @@ public class SocketUtil {
             }
         }
         return socket;
+    }
+
+    private static int setEventSubscriptions(ResourceScope scope, int socket) {
+        MemorySegment sctpEventSubscribe = sctp_event_subscribe.allocate(scope);
+        sctp_event_subscribe.sctp_data_io_event$set(sctpEventSubscribe, (byte) 1);
+        sctp_event_subscribe.sctp_shutdown_event$set(sctpEventSubscribe, (byte) 1);
+        sctp_event_subscribe.sctp_association_event$set(sctpEventSubscribe, (byte) 1);
+        return setsockopt(socket, IPPROTO_SCTP(), SCTP_EVENTS(), sctpEventSubscribe, ((int) sctp_event_subscribe.sizeof()));
+    }
+
+    private static int setInitMessage(ResourceScope scope, int socket) {
+        MemorySegment initMessage = sctp_initmsg.allocate(scope);
+        sctp_initmsg.sinit_num_ostreams$set(initMessage, (short) 17);
+        sctp_initmsg.sinit_max_instreams$set(initMessage, (short) 17);
+        sctp_initmsg.sinit_max_attempts$set(initMessage, (short) 10);
+        sctp_initmsg.sinit_max_init_timeo$set(initMessage, (short) 100);
+        return setsockopt(socket, IPPROTO_SCTP(), SCTP_INITMSG(), initMessage, ((int) sctp_initmsg.sizeof()));
     }
 
     private static MemorySegment createAddressSegment(ResourceScope scope, byte[] host, short port) {
